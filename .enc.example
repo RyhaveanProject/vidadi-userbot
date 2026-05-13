@@ -1,0 +1,9 @@
+API_ID=1234567
+API_HASH=your_api_hash_here
+SESSION_STRING=your_pyrogram_v2_session_string_here
+
+# Optional
+SONG_BOT=SongFastBot
+ARTIST_TAG=@Ryhavean
+COMMAND_PREFIXES=.
+LOG_LEVEL=INFO
