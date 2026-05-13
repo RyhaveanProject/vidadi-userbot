@@ -19,6 +19,8 @@ from utils.youtube import search_audio
 
 # --- helpers ---------------------------------------------------------------
 
+# ffmpeg parameters are a SINGLE STRING in py-tgcalls 2.2.x (NOT a dict).
+# These flags make ffmpeg auto-reconnect when the YouTube stream drops.
 _FFMPEG_NETWORK_FLAGS = (
     "-reconnect 1 "
     "-reconnect_at_eof 1 "
@@ -39,7 +41,7 @@ async def _try_create_group_call(chat_id: int) -> bool:
             )
         )
         # Give Telegram a moment to register the call
-        await asyncio.sleep(1.2)
+        await asyncio.sleep(1.5)
         return True
     except RPCError as e:
         log.warning("CreateGroupCall failed for %s: %s", chat_id, e)
@@ -49,16 +51,20 @@ async def _try_create_group_call(chat_id: int) -> bool:
         return False
 
 
-async def _stream(chat_id: int, source: str, *, is_file: bool):
-    """Start or replace the active stream in the given chat."""
-    ffmpeg_params = {} if is_file else {"before": _FFMPEG_NETWORK_FLAGS}
-
-    media = MediaStream(
+def _build_stream(source: str, *, is_file: bool) -> MediaStream:
+    """Build a MediaStream object correctly for py-tgcalls 2.2.x."""
+    return MediaStream(
         source,
         audio_parameters=AudioQuality.HIGH,
         video_flags=MediaStream.Flags.IGNORE,
-        ffmpeg_parameters=ffmpeg_params if ffmpeg_params else None,
+        # MUST be a str (or None). Passing a dict raises TypeError.
+        ffmpeg_parameters=None if is_file else _FFMPEG_NETWORK_FLAGS,
     )
+
+
+async def _stream(chat_id: int, source: str, *, is_file: bool):
+    """Start or replace the active stream in the given chat."""
+    media = _build_stream(source, is_file=is_file)
     await call_py.play(chat_id, media)
 
 
@@ -69,6 +75,8 @@ async def _stream(chat_id: int, source: str, *, is_file: bool):
     & filters.group
 )
 async def play_cmd(_, message: Message):
+    log.info(".play triggered in chat=%s by user=%s", message.chat.id,
+             message.from_user.id if message.from_user else "?")
     chat_id = message.chat.id
     started_at = time.monotonic()
 
@@ -77,6 +85,7 @@ async def play_cmd(_, message: Message):
     source_path: str | None = None
     is_file = False
     title = ""
+    status = None
 
     if replied and (replied.audio or replied.voice or replied.video or replied.document):
         status = await message.reply("Yüklənir ürəyim...", quote=True)
@@ -88,6 +97,7 @@ async def play_cmd(_, message: Message):
             media = replied.audio or replied.voice or replied.video
             title = getattr(media, "title", None) or getattr(media, "file_name", None) or "Audio"
         except Exception as e:  # noqa: BLE001
+            log.exception(".play download failed")
             await status.edit(f"Şansını bir daha sına gaga : {e}")
             return
     else:
@@ -104,7 +114,8 @@ async def play_cmd(_, message: Message):
         try:
             info = await search_audio(query)
         except Exception as e:  # noqa: BLE001
-            await status.edit(f" içnə paks tapılmadı: {e}")
+            log.exception(".play yt-dlp search failed")
+            await status.edit(f"içnə paks tapılmadı: {e}")
             return
         if not info:
             await status.edit("pay içnə yenə tapılmadı 🍑.")
@@ -129,9 +140,11 @@ async def play_cmd(_, message: Message):
         try:
             await _do_play()
         except Exception as e:  # noqa: BLE001
+            log.exception(".play retry after creating call failed")
             await status.edit(f"İçnə paks.exe səslini yenidən aç {e}")
             return
     except Exception as e:  # noqa: BLE001
+        log.exception(".play stream failed")
         await status.edit(f"Xarabdı gağa başqaısnı yoxla {e}")
         return
 
@@ -153,6 +166,7 @@ async def end_cmd(_, message: Message):
         await call_py.leave_call(chat_id)
         await message.reply("Bəsdi bu qədər qulağ asdığıvız FLY 😏", quote=True)
     except Exception as e:  # noqa: BLE001
+        log.exception(".end failed")
         await message.reply(f"⚠️ {e}", quote=True)
 
 
@@ -164,6 +178,7 @@ async def pause_cmd(_, message: Message):
         await call_py.pause_stream(message.chat.id)
         await message.reply("Sənə 1", quote=True)
     except Exception as e:  # noqa: BLE001
+        log.exception(".pause failed")
         await message.reply(f"⚠️ {e}", quote=True)
 
 
@@ -175,4 +190,5 @@ async def resume_cmd(_, message: Message):
         await call_py.resume_stream(message.chat.id)
         await message.reply("Day sənsəndə balam 🫦", quote=True)
     except Exception as e:  # noqa: BLE001
+        log.exception(".resume failed")
         await message.reply(f"⚠️ {e}", quote=True)
