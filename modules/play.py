@@ -79,7 +79,7 @@ async def play_cmd(_, message: Message):
     title = ""
 
     if replied and (replied.audio or replied.voice or replied.video or replied.document):
-        status = await message.reply("⏬ Endirilir...", quote=True)
+        status = await message.reply("Yüklənir ürəyim...", quote=True)
         try:
             source_path = await replied.download(
                 file_name=os.path.join(tempfile.gettempdir(), f"rv_{message.id}_")
@@ -88,26 +88,26 @@ async def play_cmd(_, message: Message):
             media = replied.audio or replied.voice or replied.video
             title = getattr(media, "title", None) or getattr(media, "file_name", None) or "Audio"
         except Exception as e:  # noqa: BLE001
-            await status.edit(f"❌ Endirilmədi: {e}")
+            await status.edit(f"Şansını bir daha sına gaga : {e}")
             return
     else:
         if len(message.command) < 2:
             await message.reply(
-                "ℹ️ İstifadə:\n"
-                "• `.play mahnı adı`\n"
-                "• Audio/səs faylına reply edib `.play` yaz",
+                "🥷 İstifadə:\n"
+                "• `.play Auye jizin varam`\n"
+                "• Audio/səs faylına reply edib `.play` yaz ürəg",
                 quote=True,
             )
             return
         query = message.text.split(maxsplit=1)[1]
-        status = await message.reply(f"🔎 Axtarılır: `{query}`", quote=True)
+        status = await message.reply(f"Axtarılır xəyatım 🫦: `{query}`", quote=True)
         try:
             info = await search_audio(query)
         except Exception as e:  # noqa: BLE001
-            await status.edit(f"❌ Axtarış xətası: {e}")
+            await status.edit(f" içnə paks tapılmadı: {e}")
             return
         if not info:
-            await status.edit("❌ Heç nə tapılmadı.")
+            await status.edit("pay içnə yenə tapılmadı 🍑.")
             return
         source_path = info["url"]
         title = info["title"]
@@ -122,24 +122,24 @@ async def play_cmd(_, message: Message):
         log.info("No active voice chat in %s — attempting to start one", chat_id)
         if not await _try_create_group_call(chat_id):
             await status.edit(
-                "❌ Səsli söhbət aktiv deyil və mən onu aça bilmirəm.\n"
-                "Admin rütbəsi və 'Manage Voice Chats' icazəsi lazımdır."
+                "Ayga türkün məsəli səsli söhbət bağlıdıye qadan alım\n"
+                "yetkimdə yoxdu brad özün aç səslini 😝"
             )
             return
         try:
             await _do_play()
         except Exception as e:  # noqa: BLE001
-            await status.edit(f"❌ Səsli chata qoşula bilmədim: {e}")
+            await status.edit(f"İçnə paks.exe səslini yenidən aç {e}")
             return
     except Exception as e:  # noqa: BLE001
-        await status.edit(f"❌ Oxutma alınmadı: {e}")
+        await status.edit(f"Xarabdı gağa başqaısnı yoxla {e}")
         return
 
     took = time.monotonic() - started_at
     await status.edit(
-        f"🎶 **İndi oxunur:** `{title}`\n"
+        f"🫦 **İndi ÇALIRAM (Musiqini) - Can cigər** `{title}`\n"
         f"⚡️ {took:.1f}s\n"
-        f"⏹ Dayandırmaq üçün: `.end`"
+        f" `.end` yaz və soxum içimə 🥹"
     )
 
 
@@ -151,7 +151,7 @@ async def end_cmd(_, message: Message):
     chat_id = message.chat.id
     try:
         await call_py.leave_call(chat_id)
-        await message.reply("👋 Səsli söhbətdən çıxdım.", quote=True)
+        await message.reply("Bəsdi bu qədər qulağ asdığıvız FLY 😏", quote=True)
     except Exception as e:  # noqa: BLE001
         await message.reply(f"⚠️ {e}", quote=True)
 
@@ -162,7 +162,7 @@ async def end_cmd(_, message: Message):
 async def pause_cmd(_, message: Message):
     try:
         await call_py.pause_stream(message.chat.id)
-        await message.reply("⏸ Pauza", quote=True)
+        await message.reply("Sənə 1", quote=True)
     except Exception as e:  # noqa: BLE001
         await message.reply(f"⚠️ {e}", quote=True)
 
@@ -173,6 +173,6 @@ async def pause_cmd(_, message: Message):
 async def resume_cmd(_, message: Message):
     try:
         await call_py.resume_stream(message.chat.id)
-        await message.reply("▶️ Davam", quote=True)
+        await message.reply("Day sənsəndə balam 🫦", quote=True)
     except Exception as e:  # noqa: BLE001
         await message.reply(f"⚠️ {e}", quote=True)
