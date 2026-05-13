@@ -47,11 +47,11 @@ async def _wait_for_audio(client, bot_username: str, after_ts: float, timeout: f
 )
 async def song_cmd(client, message: Message):
     if len(message.command) < 2:
-        await message.reply("ℹ️ İstifadə: `.song mahnı adı`", quote=True)
+        await message.reply("🥷 İstifadə: `.song mahnı adı`", quote=True)
         return
 
     query = message.text.split(maxsplit=1)[1].strip()
-    status = await message.reply(f"🔎 `{query}` axtarılır...", quote=True)
+    status = await message.reply(f"🔎 `{query}` Arıyorum bebegim 🫦...", quote=True)
 
     async with _LOCK:
         try:
@@ -67,7 +67,7 @@ async def song_cmd(client, message: Message):
             # 3. Wait for results message with inline buttons
             results_msg = await _wait_for_results(client, SONG_BOT, sent_ts, timeout=8.0)
             if not results_msg:
-                await status.edit("❌ Nəticə tapılmadı.")
+                await status.edit("Gaga məzələnisən? elə mahnı yoxdue 🤬")
                 return
 
             # 4. Click the first button
@@ -85,14 +85,14 @@ async def song_cmd(client, message: Message):
                             callback_data=btn.callback_data,
                         )
                 except Exception as e2:  # noqa: BLE001
-                    await status.edit(f"❌ Düyməyə basa bilmədim: {e2}")
+                    await status.edit(f"Bir deşiyi tutturanmadım {e2}")
                     return
 
             # 5. Wait for audio
             click_ts = time.time()
             audio_msg = await _wait_for_audio(client, SONG_BOT, click_ts, timeout=20.0)
             if not audio_msg:
-                await status.edit("❌ Mahnı gəlmədi (timeout).")
+                await status.edit("❌ Mahnı gəlmədi qaçdı (timeout).")
                 return
 
             # 6. Download
@@ -134,6 +134,6 @@ async def song_cmd(client, message: Message):
         except Exception as e:  # noqa: BLE001
             log.exception("song_cmd error")
             try:
-                await status.edit(f"❌ Xəta: {e}")
+                await status.edit(f"Medyanı açın blet {e}")
             except Exception:  # noqa: BLE001
                 pass
