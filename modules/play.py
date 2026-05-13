@@ -1,13 +1,11 @@
 import asyncio
 import os
-import random
 import tempfile
 import time
 
 from pyrogram import filters
 from pyrogram.types import Message
-from pyrogram.raw.functions.phone import CreateGroupCall
-from pyrogram.errors import RPCError
+from pyrogram.errors import FloodWait
 
 from pytgcalls.types import MediaStream, AudioQuality
 from pytgcalls.exceptions import NoActiveGroupCall
@@ -20,7 +18,6 @@ from utils.youtube import search_audio
 # --- helpers ---------------------------------------------------------------
 
 # ffmpeg parameters are a SINGLE STRING in py-tgcalls 2.2.x (NOT a dict).
-# These flags make ffmpeg auto-reconnect when the YouTube stream drops.
 _FFMPEG_NETWORK_FLAGS = (
     "-reconnect 1 "
     "-reconnect_at_eof 1 "
@@ -30,40 +27,16 @@ _FFMPEG_NETWORK_FLAGS = (
 )
 
 
-async def _try_create_group_call(chat_id: int) -> bool:
-    """Try to start a voice chat if user has admin rights. Returns True on success."""
-    try:
-        peer = await app.resolve_peer(chat_id)
-        await app.invoke(
-            CreateGroupCall(
-                peer=peer,
-                random_id=random.randint(10_000_000, 999_999_999),
-            )
-        )
-        # Give Telegram a moment to register the call
-        await asyncio.sleep(1.5)
-        return True
-    except RPCError as e:
-        log.warning("CreateGroupCall failed for %s: %s", chat_id, e)
-        return False
-    except Exception as e:  # noqa: BLE001
-        log.warning("CreateGroupCall error for %s: %s", chat_id, e)
-        return False
-
-
 def _build_stream(source: str, *, is_file: bool) -> MediaStream:
-    """Build a MediaStream object correctly for py-tgcalls 2.2.x."""
     return MediaStream(
         source,
         audio_parameters=AudioQuality.HIGH,
         video_flags=MediaStream.Flags.IGNORE,
-        # MUST be a str (or None). Passing a dict raises TypeError.
         ffmpeg_parameters=None if is_file else _FFMPEG_NETWORK_FLAGS,
     )
 
 
 async def _stream(chat_id: int, source: str, *, is_file: bool):
-    """Start or replace the active stream in the given chat."""
     media = _build_stream(source, is_file=is_file)
     await call_py.play(chat_id, media)
 
@@ -80,7 +53,7 @@ async def play_cmd(_, message: Message):
     chat_id = message.chat.id
     started_at = time.monotonic()
 
-    # 1. Determine source
+    # 1. Mənbə təyini
     replied = message.reply_to_message
     source_path: str | None = None
     is_file = False
@@ -123,26 +96,21 @@ async def play_cmd(_, message: Message):
         source_path = info["url"]
         title = info["title"]
 
-    # 2. Try to play. If no active call -> attempt to create one.
-    async def _do_play():
-        await _stream(chat_id, source_path, is_file=is_file)
-
+    # 2. Çal. Aktiv VC yoxdursa — userbot ilə YARATMA (Telegram session-ı revoke edir).
     try:
-        await _do_play()
+        await _stream(chat_id, source_path, is_file=is_file)
     except NoActiveGroupCall:
-        log.info("No active voice chat in %s — attempting to start one", chat_id)
-        if not await _try_create_group_call(chat_id):
-            await status.edit(
-                "Ayga türkün məsəli səsli söhbət bağlıdıye qadan alım\n"
-                "yetkimdə yoxdu brad özün aç səslini 😝"
-            )
-            return
-        try:
-            await _do_play()
-        except Exception as e:  # noqa: BLE001
-            log.exception(".play retry after creating call failed")
-            await status.edit(f"İçnə paks.exe səslini yenidən aç {e}")
-            return
+        # Userbot-un CreateGroupCall raw API çağırması Telegram anti-abuse-ı
+        # işə salır və hesabı deauthorize edir. İstifadəçi VC-ni özü açmalıdır.
+        await status.edit(
+            "Ayga türkün məsəli səsli söhbət bağlıdıye qadan alım\n"
+            "yetkimdə yoxdu brad özün aç səslini 😝"
+        )
+        return
+    except FloodWait as fw:
+        log.warning(".play FloodWait %s san.", fw.value)
+        await status.edit(f"Telegram bizi {fw.value}s gözlədir, sonra yenidən cəhd et.")
+        return
     except Exception as e:  # noqa: BLE001
         log.exception(".play stream failed")
         await status.edit(f"Xarabdı gağa başqaısnı yoxla {e}")
