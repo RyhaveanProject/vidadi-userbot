@@ -9,9 +9,10 @@ logging.basicConfig(
     level=getattr(logging, LOG_LEVEL.upper(), logging.INFO),
     format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
 )
-# Silence noisy libs
-logging.getLogger("pyrogram").setLevel(logging.WARNING)
-logging.getLogger("pytgcalls").setLevel(logging.WARNING)
+# Keep pyrogram/pytgcalls at INFO so Railway logs show what's happening
+# (handler triggers, call lifecycle, etc.). Bump to WARNING if too noisy.
+logging.getLogger("pyrogram").setLevel(logging.INFO)
+logging.getLogger("pytgcalls").setLevel(logging.INFO)
 
 log = logging.getLogger("ryhavean")
 
